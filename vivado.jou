@@ -1,0 +1,48 @@
+#-----------------------------------------------------------
+# Vivado v2024.1 (64-bit)
+# SW Build 5076996 on Wed May 22 18:37:14 MDT 2024
+# IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
+# SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
+# Start of session at: Tue Jan 21 07:35:32 2025
+# Process ID: 1996
+# Current directory: C:/uart/uart communication
+# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent17512 C:\uart\uart communication\uart communication.xpr
+# Log file: C:/uart/uart communication/vivado.log
+# Journal file: C:/uart/uart communication\vivado.jou
+# Running On        :skanda
+# Platform          :Windows Server 2016 or Windows 10
+# Operating System  :22631
+# Processor Detail  :12th Gen Intel(R) Core(TM) i7-1255U
+# CPU Frequency     :2611 MHz
+# CPU Physical cores:10
+# CPU Logical cores :12
+# Host memory       :16835 MB
+# Swap memory       :2550 MB
+# Total Virtual     :19385 MB
+# Available Virtual :7973 MB
+#-----------------------------------------------------------
+start_gui
+open_project {C:/uart/uart communication/uart communication.xpr}
+update_compile_order -fileset sources_1
+update_compile_order -fileset sources_1
+launch_simulation
+source baud_rate_generator_tb.tcl
+close_sim
+launch_simulation
+source baud_rate_generator_tb.tcl
+close_sim
+update_compile_order -fileset sources_1
+# Disabling source management mode.  This is to allow the top design properties to be set without GUI intervention.
+set_property source_mgmt_mode None [current_project]
+set_property top baud_rate_generator_tb [current_fileset]
+# Re-enabling previously disabled source management mode.
+set_property source_mgmt_mode All [current_project]
+update_compile_order -fileset sources_1
+launch_simulation
+source baud_rate_generator_tb.tcl
+close_sim
+launch_simulation
+launch_simulation
+launch_simulation
+source baud_rate_generator_tb.tcl
+close_sim
