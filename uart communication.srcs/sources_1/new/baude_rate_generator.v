@@ -1,23 +1,22 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Engineering College: BMS College of Engineering (BMSCE)
+// Engineer: K M Skanda
 // 
 // Create Date: 21.01.2025 06:05:46
-// Design Name: 
-// Module Name: baude_rate_generator
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
+// Design Name: Baud Rate Generator
+// Module Name: baud_rate_generator
+// Project Name: UART Communication
+// Target Devices: FPGA or ASIC
+// Tool Versions: Vivado 2025.1, ModelSim 2025.1
 // Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
+// This module generates a configurable baud clock signal based on the input
+// clock frequency (50 MHz) and the selected baud rate. The supported baud rates 
+// are:
+// - 2400
+// - 4800
+// - 9600
+// - 19200
 module baud_rate_generator (
     input wire clk,           // Input clock signal (50 MHz)
     input wire rst,           // Reset signal (active high)
