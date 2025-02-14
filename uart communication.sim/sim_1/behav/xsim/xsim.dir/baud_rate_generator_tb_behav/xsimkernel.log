@@ -1,7 +1,0 @@
-Running: xsim.dir/baud_rate_generator_tb_behav/xsimk.exe -simmode gui -wdb baud_rate_generator_tb_behav.wdb -simrunnum 0 -socket 53887
-Design successfully loaded
-Design Loading Memory Usage: 8372 KB (Peak: 8372 KB)
-Design Loading CPU Usage: 15 ms
-Simulation completed
-Simulation Memory Usage: 8992 KB (Peak: 8992 KB)
-Simulation CPU Usage: 15 ms
