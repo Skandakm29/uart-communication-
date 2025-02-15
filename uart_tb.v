@@ -1,73 +1,91 @@
-//////////////////////////////////////////////////////////////////////////////////
-// Company: BMSCE
-// Engineer: K M SKANDA
-// 
-// Create Date: 14.02.2025
-// Design Name: uart_communication
-// Module Name: uart
-// Project Name: UART Communication
-// Target Devices: FPGA (VSD Squadcom Mini FPGA)
-// Tool Versions: Open-source FPGA Tools (Yosys, NextPNR, IceStorm)
-//
-// Dependencies: 
-//      Requires the uart module.
-//
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
-`include "uart.v"
-module uart_full_duplex_tb;
-    reg clk, rst, tx_start, rx_serial, baud_rate_clk;
-    reg [7:0] tx_byte;
-    wire tx_out, tx_busy;
-    wire [7:0] rx_byte;
-    wire rx_done;
 
-    // Instantiate Full-Duplex UART Module
-    uart uut (
-        .clk(clk),
-        .rst(rst),
-        .tx_start(tx_start),
-        .tx_byte(tx_byte),
-        .rx_serial(rx_serial),
-        .baud_rate_clk(baud_rate_clk),
-        .tx_out(tx_out),
-        .tx_busy(tx_busy),
-        .rx_byte(rx_byte),
-        .rx_done(rx_done)
-    );
+`include "uart_tx.v"
+`include "uart_rx.v"
 
-    always #10 clk = ~clk;  // 50 MHz System Clock
-    always #8680 baud_rate_clk = ~baud_rate_clk;  // 115200 Baud Rate Clock
+module uart_full_duplex_tb ();
 
-    initial begin
-        $dumpfile("uart_full_duplex.vcd");
-        $dumpvars(0, uart_full_duplex_tb);
+  // Testbench Configuration
+  parameter CLOCK_PERIOD_NS = 20;      // 50 MHz clock
+  parameter CLKS_PER_BIT = 217;        // Matches your TX & RX modules
+  parameter BIT_PERIOD = 4340;         // Approximate bit duration (CLKS_PER_BIT * CLOCK_PERIOD_NS)
+   
+  reg clk = 0;
+  reg rst = 1;
+  reg tx_start = 0;
+  reg [7:0] tx_byte = 8'h00;
+  wire tx_out, tx_busy;
+  wire [7:0] rx_byte;
+  wire rx_done;
+  reg rx_serial;
 
-        clk = 0; rst = 1; tx_start = 0; tx_byte = 8'h00; baud_rate_clk = 0;
-        #50 rst = 0;
+  // Instantiate TX and RX UART Modules
+  uart_tx #(.CLKS_PER_BIT(CLKS_PER_BIT)) uart_tx_inst (
+      .clk(clk),
+      .rst(rst),
+      .tx_start(tx_start),
+      .tx_byte(tx_byte),
+      .tx_out(tx_out),
+      .tx_busy(tx_busy)
+  );
 
-        // Test Case 1: TX Sends 0xA5, RX Receives It
-        tx_byte = 8'hA5;
-        tx_start = 1;
-        #20 tx_start = 0;
+  uart_rx #(.CLKS_PER_BIT(CLKS_PER_BIT)) uart_rx_inst (
+      .clk(clk),
+      .rst(rst),
+      .rx_serial(rx_serial),
+      .rx_done(rx_done),
+      .rx_byte(rx_byte)
+  );
 
-        // Simulate receiving 0xA5 on rx_serial
-        #8680 rx_serial = 0;  // Start Bit
-        #8680 rx_serial = 1;  // Data Bit 0
-        #8680 rx_serial = 0;  // Data Bit 1
-        #8680 rx_serial = 1;  // Data Bit 2
-        #8680 rx_serial = 0;  // Data Bit 3
-        #8680 rx_serial = 1;  // Data Bit 4
-        #8680 rx_serial = 0;  // Data Bit 5
-        #8680 rx_serial = 1;  // Data Bit 6
-        #8680 rx_serial = 1;  // Data Bit 7
-        #8680 rx_serial = 1;  // Stop Bit
+  // Generate 50 MHz System Clock
+  always #(CLOCK_PERIOD_NS/2) clk = ~clk;
 
-        #20000;
-        $finish;
+  // Task to Simulate UART Reception
+  task UART_WRITE_BYTE;
+    input [7:0] data;
+    integer i;
+    begin
+      rx_serial = 0; // Start Bit
+      #(BIT_PERIOD);
+      
+      for (i = 0; i < 8; i = i + 1) begin
+          rx_serial = data[i]; // Send each bit
+          #(BIT_PERIOD);
+      end
+
+      rx_serial = 1; // Stop Bit
+      #(BIT_PERIOD);
     end
+  endtask
+
+  // Main Test Sequence
+  initial begin
+      $dumpfile("uart_full_duplex.vcd");
+      $dumpvars(0, uart_full_duplex_tb);
+
+      // Initialization
+      rx_serial = 1;  // Default high (idle)
+      #50 rst = 0;
+
+      // Test Case 1: TX Sends 0xA5, RX Receives It
+      #100;
+      tx_byte = 8'hA5;
+      tx_start = 1;
+      #20 tx_start = 0;
+
+      // Wait for TX to complete
+      @(negedge tx_busy);
+
+      // Simulate RX Receiving 0xA5
+      UART_WRITE_BYTE(8'hA5);
+
+      // Verify Correct Reception
+      #20000;
+      if (rx_byte == 8'hA5)
+          $display("Test Passed: RX Received Correct Byte 0xA5");
+      else
+          $display("Test Failed: RX Received Incorrect Byte 0x%h", rx_byte);
+
+      $finish;
+  end
 endmodule

@@ -1,96 +1,93 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 14.02.2025 
-// Design Name: 
-// Module Name: uart_rx
-// Project Name: uart_communication
-// Target Devices: vsdsquadcom mini fpga board
-// Tool Versions:  
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
 module uart_tx 
-(
-    input wire clk,           // System clock
-    input wire rst,           // Reset
-    input wire tx_start,      // Start transmission
-    input wire [7:0] byte,    // 8-bit data to transmit
-    input wire baud_rate_clk, // Baud rate clock
-    output reg tx_out,        // UART TX output
-    output reg tx_busy        // TX busy flag
-);
+  #(parameter CLKS_PER_BIT=217)
+  (
+   input wire clk,           // System Clock
+   input wire rst,           // Reset
+   input wire tx_start,      // Start Transmission
+   input wire [7:0] tx_byte, // 8-bit Data to Transmit
+   output reg tx_out,        // UART TX Output
+   output reg tx_busy        // TX Busy Flag
+   );
 
-    // UART FSM States
-parameter [2:0] 
-        IDLE  = 3'b000,  
-        LOAD  = 3'b001,  
-        START = 3'b010,  
-        DATA  = 3'b011,  
-        STOP  = 3'b100;
-       reg [2:0]state;
+  parameter IDLE         = 3'b000;
+  parameter START        = 3'b001;
+  parameter DATA         = 3'b010;
+  parameter STOP         = 3'b011;
+  parameter CLEANUP      = 3'b100;
+   
+  reg [2:0] state = IDLE;     // Current State
+  reg [7:0] baud_counter = 0; // Baud Rate Counter
+  reg [2:0] bit_index = 0;    // Bit Counter
+  reg [7:0] shift_reg = 0;    // Shift Register
 
-    reg [7:0] shift_reg = 8'b0; // Shift register
-    reg [3:0] bit_counter = 0;  // Bit counter
-
-always @(posedge clk ) begin
-            case (state)
-                // IDLE State: Wait for Start Signal
-                IDLE: begin
-                    tx_out <= 1'b1;  // TX line stays HIGH
-                    tx_busy <= 1'b0; // TX is idle
-                    if (tx_start) begin
-                        shift_reg <= byte;  // Load data
-                        tx_busy <= 1'b1;    // TX is now busy
-                        state <= LOAD;
-                    end
-                end
-
-                //  LOAD State: Move Data into Shift Register
-                LOAD: begin
-                    state <= START;
-                end
-
-                // START State: Send Start Bit (0)
-                START: begin
-                    tx_out <= 1'b0; // Start bit
-                    if (baud_rate_clk) begin
-                        bit_counter <= 4'b0000;
-                        state <= DATA;
-                    end
-                end
-
-                //  DATA State: Transmit 8 Data Bits
-                DATA: begin
-                    if (baud_rate_clk) begin
-                        tx_out <= shift_reg[0]; // Send LSB first
-                        shift_reg <= shift_reg >> 1; // Shift data
-                        bit_counter <= bit_counter + 1;
-                        if (bit_counter == 7) begin
-                            state <= STOP;
-                        end
-                    end
-                end
-
-                //  STOP State: Send Stop Bit (1)
-                STOP: begin
-                    if (baud_rate_clk) begin
-                        tx_out <= 1'b1; // Stop bit
-                        state <= IDLE;  // Go back to IDLE
-                        tx_busy <= 1'b0; // TX is now idle
-                    end
-                end
-
-                default: state <= IDLE;
-            endcase
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+      state <= IDLE;
+      tx_out <= 1'b1;
+      tx_busy <= 0;
+      shift_reg <= 8'b0;
+      baud_counter <= 0;
+      bit_index <= 0;
+    end else begin
+      case (state)
+        IDLE: begin
+          tx_out <= 1'b1;
+          tx_busy <= 0;
+          baud_counter <= 0;
+          bit_index <= 0;
+          if (tx_start) begin
+            shift_reg <= tx_byte;
+            tx_busy <= 1;
+            state <= START;
+          end
         end
+
+        START: begin
+          tx_out <= 1'b0; // Start bit
+          if (baud_counter < CLKS_PER_BIT-1) begin
+            baud_counter <= baud_counter + 1;
+          end else begin
+            baud_counter <= 0;
+            state <= DATA;
+          end
+        end
+
+        DATA: begin
+          tx_out <= shift_reg[0]; // Send LSB first
+          if (baud_counter < CLKS_PER_BIT-1) begin
+            baud_counter <= baud_counter + 1;
+          end else begin
+            baud_counter <= 0;
+            shift_reg <= shift_reg >> 1;
+            if (bit_index < 7) begin
+              bit_index <= bit_index + 1;
+              state <= DATA;
+            end else begin
+              bit_index <= 0;
+              state <= STOP;
+            end
+          end
+        end
+
+        STOP: begin
+          tx_out <= 1'b1; // Stop bit
+          if (baud_counter < CLKS_PER_BIT-1) begin
+            baud_counter <= baud_counter + 1;
+          end else begin
+            tx_busy <= 0;
+            baud_counter <= 0;
+            state <= CLEANUP;
+          end
+        end
+
+        CLEANUP: begin
+          state <= IDLE;
+        end
+
+        default: state <= IDLE;
+      endcase
+    end
+  end
 endmodule

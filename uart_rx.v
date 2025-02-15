@@ -1,85 +1,92 @@
-//////////////////////////////////////////////////////////////////////////////////
-// Company: BMSCE
-// Engineer: K M SKANDA
-// 
-// Create Date: 14.02.2025
-// Design Name: uart_communication
-// Module Name: uart_rx
-// Project Name: UART Communication
-// Target Devices: FPGA (VSD Squadcom Mini FPGA)
-// Tool Versions: Open-source FPGA Tools (Yosys, NextPNR, IceStorm)
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 
-module uart_rx (
-    input wire clk,            // System Clock
-    input wire rst,            // Reset
-    input wire rx_serial,      // Serial RX Data Line
-    input wire baud_rate_clk,  // Baud rate clock
-    output reg [7:0] rx_byte,  // Received Byte Output
-    output reg rx_done         // RX Complete Flag
-);
+module uart_rx 
+  #(parameter CLKS_PER_BIT=217)
+  (
+   input wire clk,             // System Clock
+   input wire rst,             // Reset
+   input wire rx_serial,       // Serial RX Data Line
+   output reg rx_done,         // RX Complete Flag
+   output reg [7:0] rx_byte    // Received Byte Output
+   );
+    
+  parameter IDLE         = 3'b000;
+  parameter START        = 3'b001;
+  parameter DATA         = 3'b010;
+  parameter STOP         = 3'b011;
+  parameter CLEANUP      = 3'b100;
+   
+  reg [2:0] state = IDLE;     // Current State
+  reg [7:0] baud_counter = 0; // Baud rate counter
+  reg [2:0] bit_index = 0;    // Bit Counter
+  reg [7:0] shift_reg = 0;    // Shift Register
 
-    // FSM States
-    parameter IDLE  = 3'b000;
-    parameter START = 3'b001;
-    parameter DATA  = 3'b010;
-    parameter STOP  = 3'b011;
-    parameter DONE  = 3'b100;
-
-    reg [2:0] state = IDLE;     // Current State
-    reg [3:0] bit_index = 0;    // Bit Counter
-    reg [7:0] shift_reg = 0;    // Shift Register
-
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            state <= IDLE;
-            rx_done <= 0;
-            rx_byte <= 8'b0;
-            shift_reg <= 8'b0;
-        end else begin
-            case (state)
-                IDLE: begin
-                    rx_done <= 0;
-                    if (rx_serial == 0)  // Start bit detected
-                        state <= START;
-                end
-
-                START: begin
-                    if (baud_rate_clk)
-                        state <= DATA;
-                end
-
-                DATA: begin
-                    if (baud_rate_clk) begin
-                        shift_reg[bit_index] <= rx_serial;  // Sample data
-                        bit_index <= bit_index + 1;
-                        if (bit_index == 7) 
-                            state <= STOP;
-                    end
-                end
-
-                STOP: begin
-                    if (baud_rate_clk) begin
-                        if (rx_serial == 1) begin  // Valid stop bit
-                            rx_byte <= shift_reg;
-                            rx_done <= 1;
-                            state <= DONE;
-                        end else begin
-                            state <= IDLE;  // Error detected, restart
-                        end
-                    end
-                end
-
-                DONE: begin
-                    state <= IDLE;
-                end
-
-            endcase
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+      state <= IDLE;
+      rx_done <= 0;
+      rx_byte <= 8'b0;
+      shift_reg <= 8'b0;
+      baud_counter <= 0;
+      bit_index <= 0;
+    end else begin
+      case (state)
+        IDLE: begin
+          rx_done <= 0;
+          baud_counter <= 0;
+          bit_index <= 0;
+          if (rx_serial == 0)   // Start bit detected
+            state <= START;
         end
+
+        START: begin
+          if (baud_counter == (CLKS_PER_BIT-1)/2) begin
+            if (rx_serial == 0) begin
+              baud_counter <= 0;
+              state <= DATA;
+            end else
+              state <= IDLE;
+          end else begin
+            baud_counter <= baud_counter + 1;
+            state <= START;
+          end
+        end
+
+        DATA: begin
+          if (baud_counter < CLKS_PER_BIT-1) begin
+            baud_counter <= baud_counter + 1;
+          end else begin
+            baud_counter <= 0;
+            shift_reg[bit_index] <= rx_serial;
+
+            if (bit_index < 7) begin
+              bit_index <= bit_index + 1;
+              state <= DATA;
+            end else begin
+              bit_index <= 0;
+              state <= STOP;
+            end
+          end
+        end
+
+        STOP: begin
+          if (baud_counter < CLKS_PER_BIT-1) begin
+            baud_counter <= baud_counter + 1;
+          end else begin
+            rx_done <= 1;  // Indicate data received
+            rx_byte <= shift_reg;
+            baud_counter <= 0;
+            state <= CLEANUP;
+          end
+        end
+
+        CLEANUP: begin
+          rx_done <= 0;
+          state <= IDLE;
+        end
+
+        default: state <= IDLE;
+      endcase
     end
+  end
 endmodule
